@@ -339,6 +339,20 @@ namespace GameFramework.Resource
             }
 
             /// <summary>
+            /// 获取资源包
+            /// </summary>
+            /// <param name="asset"></param>
+            /// <returns></returns>
+            public object GetResourceFromAsset(object asset)
+            {
+                if (m_AssetToResourceMap.TryGetValue(asset, out object resouce))
+                {
+                    return resouce;
+                }
+                return null;
+            }
+
+            /// <summary>
             /// 卸载资源。
             /// </summary>
             /// <param name="asset">要卸载的资源。</param>

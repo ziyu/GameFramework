@@ -1211,6 +1211,26 @@ namespace GameFramework.Resource
         }
 
         /// <summary>
+        /// 获取资源包
+        /// </summary>
+        /// <param name="asset">资源</param>
+        /// <returns></returns>
+        public object GetResourceFromAsset(object asset)
+        {
+            if (asset == null)
+            {
+                throw new GameFrameworkException("Asset is invalid.");
+            }
+
+            if (m_ResourceLoader == null)
+            {
+                return null;
+            }
+
+            return m_ResourceLoader.GetResourceFromAsset(asset);
+        }
+
+        /// <summary>
         /// 卸载资源。
         /// </summary>
         /// <param name="asset">要卸载的资源。</param>

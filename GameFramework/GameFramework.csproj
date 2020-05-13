@@ -313,6 +313,7 @@
     <Compile Include="UI\IUIGroup.cs" />
     <Compile Include="UI\IUIGroupHelper.cs" />
     <Compile Include="UI\IUIManager.cs" />
+    <Compile Include="UI\IUIResourceHelper.cs" />
     <Compile Include="UI\OpenUIFormDependencyAssetEventArgs.cs" />
     <Compile Include="UI\OpenUIFormFailureEventArgs.cs" />
     <Compile Include="UI\OpenUIFormSuccessEventArgs.cs" />
@@ -349,4 +350,8 @@
     <Compile Include="WebRequest\WebRequestStartEventArgs.cs" />
     <Compile Include="WebRequest\WebRequestSuccessEventArgs.cs" />
   </ItemGroup>
+  <PropertyGroup>
+    <PostBuildEvent>copy "$(TargetDir)$(ProjectName).dll" "$(SolutionDir)..\UnityGameFrameworkProject\Assets\UnityGameFramework\Libraries\$(ProjectName).dll
+copy "$(TargetDir)$(ProjectName).xml" "$(SolutionDir)..\UnityGameFrameworkProject\Assets\UnityGameFramework\Libraries\$(ProjectName).xml</PostBuildEvent>
+  </PropertyGroup>
 </Project>

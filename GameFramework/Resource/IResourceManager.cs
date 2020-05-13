@@ -476,6 +476,13 @@ namespace GameFramework.Resource
         void LoadAsset(string assetName, Type assetType, int priority, LoadAssetCallbacks loadAssetCallbacks, object userData);
 
         /// <summary>
+        /// 获取资源包
+        /// </summary>
+        /// <param name="asset">资源</param>
+        /// <returns></returns>
+        object GetResourceFromAsset(object asset);
+
+        /// <summary>
         /// 卸载资源。
         /// </summary>
         /// <param name="asset">要卸载的资源。</param>
