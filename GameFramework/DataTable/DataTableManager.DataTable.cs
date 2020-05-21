@@ -8,6 +8,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 
 namespace GameFramework.DataTable
 {
@@ -66,14 +67,14 @@ namespace GameFramework.DataTable
             {
                 get
                 {
-                    return GetDataRow(id);
+                    return GetDataRowT(id);
                 }
             }
 
             /// <summary>
             /// 获取编号最小的数据表行。
             /// </summary>
-            public T MinIdDataRow
+            public T MinIdDataRowT
             {
                 get
                 {
@@ -84,7 +85,7 @@ namespace GameFramework.DataTable
             /// <summary>
             /// 获取编号最大的数据表行。
             /// </summary>
-            public T MaxIdDataRow
+            public T MaxIdDataRowT
             {
                 get
                 {
@@ -92,12 +93,16 @@ namespace GameFramework.DataTable
                 }
             }
 
+            public override IDataRow MinIdDataRow => m_MinIdDataRow;
+
+            public override IDataRow MaxIdDataRow => m_MaxIdDataRow;
+
             /// <summary>
             /// 检查是否存在数据表行。
             /// </summary>
             /// <param name="id">数据表行的编号。</param>
             /// <returns>是否存在数据表行。</returns>
-            public bool HasDataRow(int id)
+            public override bool HasDataRow(int id)
             {
                 return m_DataSet.ContainsKey(id);
             }
@@ -130,7 +135,7 @@ namespace GameFramework.DataTable
             /// </summary>
             /// <param name="id">数据表行的编号。</param>
             /// <returns>数据表行。</returns>
-            public T GetDataRow(int id)
+            public T GetDataRowT(int id)
             {
                 T dataRow = null;
                 if (m_DataSet.TryGetValue(id, out dataRow))
@@ -334,7 +339,7 @@ namespace GameFramework.DataTable
             /// 获取所有数据表行。
             /// </summary>
             /// <returns>所有数据表行。</returns>
-            public T[] GetAllDataRows()
+            public T[] GetAllDataRowsT()
             {
                 int index = 0;
                 T[] results = new T[m_DataSet.Count];
@@ -482,6 +487,178 @@ namespace GameFramework.DataTable
                 {
                     m_MaxIdDataRow = dataRow;
                 }
+            }
+
+            List<T> internal_results;
+            public override bool HasDataRow(Predicate<IDataRow> condition)
+            {
+                if (condition == null)
+                {
+                    throw new GameFrameworkException("Condition is invalid.");
+                }
+
+                foreach (KeyValuePair<int, T> dataRow in m_DataSet)
+                {
+                    if (condition(dataRow.Value))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            public override IDataRow GetDataRow(int id)
+            {
+                return GetDataRowT(id);
+            }
+
+            public override IDataRow GetDataRow(Predicate<IDataRow> condition)
+            {
+                if (condition == null)
+                {
+                    throw new GameFrameworkException("Condition is invalid.");
+                }
+
+                foreach (KeyValuePair<int, T> dataRow in m_DataSet)
+                {
+                    if (condition(dataRow.Value))
+                    {
+                        return dataRow.Value;
+                    }
+                }
+
+                return null;
+            }
+
+            public override IDataRow[] GetDataRows(Predicate<IDataRow> condition)
+            {
+                if (condition == null)
+                {
+                    throw new GameFrameworkException("Condition is invalid.");
+                }
+
+                List<IDataRow> results = new List<IDataRow>();
+                foreach (KeyValuePair<int, T> dataRow in m_DataSet)
+                {
+                    if (condition(dataRow.Value))
+                    {
+                        results.Add(dataRow.Value);
+                    }
+                }
+
+                return results.ToArray();
+            }
+
+
+            public override void GetDataRows(Predicate<IDataRow> condition, List<IDataRow> results)
+            {
+                if (internal_results == null) internal_results = new List<T>();
+                internal_results.Clear();
+                GetDataRows((T datarow0) =>
+                {
+                    return condition(datarow0);
+                }, internal_results);
+                for (int i = 0; i < internal_results.Count; i++)
+                {
+                    results.Add(internal_results[i]);
+                }
+                internal_results.Clear();
+            }
+
+            public override IDataRow[] GetDataRows(Comparison<IDataRow> comparison)
+            {
+                if (comparison == null)
+                {
+                    throw new GameFrameworkException("Comparison is invalid.");
+                }
+
+                List<IDataRow> results = new List<IDataRow>();
+                foreach (KeyValuePair<int, T> dataRow in m_DataSet)
+                {
+                    results.Add(dataRow.Value);
+                }
+
+                results.Sort(comparison);
+                return results.ToArray();
+
+            }
+
+            public override void GetDataRows(Comparison<IDataRow> comparison, List<IDataRow> results)
+            {
+                if (internal_results == null) internal_results = new List<T>();
+                internal_results.Clear();
+                GetDataRows((T x, T y) =>
+                {
+                    return comparison(x, y);
+                }, internal_results);
+                for (int i = 0; i < internal_results.Count; i++)
+                {
+                    results.Add(internal_results[i]);
+                }
+                internal_results.Clear();
+            }
+
+            public override IDataRow[] GetDataRows(Predicate<IDataRow> condition, Comparison<IDataRow> comparison)
+            {
+                if (condition == null)
+                {
+                    throw new GameFrameworkException("Condition is invalid.");
+                }
+
+                if (comparison == null)
+                {
+                    throw new GameFrameworkException("Comparison is invalid.");
+                }
+
+                List<IDataRow> results = new List<IDataRow>();
+                foreach (KeyValuePair<int, T> dataRow in m_DataSet)
+                {
+                    if (condition(dataRow.Value))
+                    {
+                        results.Add(dataRow.Value);
+                    }
+                }
+
+                results.Sort(comparison);
+                return results.ToArray();
+            }
+
+
+            public override void GetDataRows(Predicate<IDataRow> condition, Comparison<IDataRow> comparison, List<IDataRow> results)
+            {
+                if (internal_results == null) internal_results = new List<T>();
+                internal_results.Clear();
+                GetDataRows((T datarow0) =>
+                {
+                    return condition(datarow0);
+                }, (T x, T y) =>
+                {
+                    return comparison(x, y);
+                }, internal_results);
+                for (int i = 0; i < internal_results.Count; i++)
+                {
+                    results.Add(internal_results[i]);
+                }
+                internal_results.Clear();
+            }
+
+            public override IDataRow[] GetAllDataRows()
+            {
+                return GetAllDataRowsT();
+            }
+
+
+            public override void GetAllDataRows(List<IDataRow> results)
+            {
+                if (internal_results == null) internal_results = new List<T>();
+                internal_results.Clear();
+                GetAllDataRows(internal_results);
+                for (int i = 0; i < internal_results.Count; i++)
+                {
+                    results.Add(internal_results[i]);
+                }
+                internal_results.Clear();
             }
         }
     }

@@ -61,7 +61,7 @@ namespace GameFramework.DataTable
         /// <summary>
         /// 获取编号最小的数据表行。
         /// </summary>
-        T MinIdDataRow
+        T MinIdDataRowT
         {
             get;
         }
@@ -69,7 +69,7 @@ namespace GameFramework.DataTable
         /// <summary>
         /// 获取编号最大的数据表行。
         /// </summary>
-        T MaxIdDataRow
+        T MaxIdDataRowT
         {
             get;
         }
@@ -93,7 +93,7 @@ namespace GameFramework.DataTable
         /// </summary>
         /// <param name="id">数据表行的编号。</param>
         /// <returns>数据表行。</returns>
-        T GetDataRow(int id);
+        T GetDataRowT(int id);
 
         /// <summary>
         /// 获取符合条件的数据表行。
@@ -151,7 +151,7 @@ namespace GameFramework.DataTable
         /// 获取所有数据表行。
         /// </summary>
         /// <returns>所有数据表行。</returns>
-        T[] GetAllDataRows();
+        T[] GetAllDataRowsT();
 
         /// <summary>
         /// 获取所有数据表行。
@@ -178,5 +178,146 @@ namespace GameFramework.DataTable
         /// 清空所有数据表行。
         /// </summary>
         void RemoveAllDataRows();
+    }
+
+
+    /// <summary>
+    /// 数据表接口。
+    /// </summary>
+    public interface IDataTable
+    {
+        /// <summary>
+        /// 获取数据表名称。
+        /// </summary>
+        string Name
+        {
+            get;
+        }
+
+        /// <summary>
+        /// 获取数据表完整名称。
+        /// </summary>
+        string FullName
+        {
+            get;
+        }
+
+        /// <summary>
+        /// 获取数据表行的类型。
+        /// </summary>
+        Type Type
+        {
+            get;
+        }
+
+        /// <summary>
+        /// 获取数据表行数。
+        /// </summary>
+        int Count
+        {
+            get;
+        }
+
+        /// <summary>
+        /// 获取编号最小的数据表行。
+        /// </summary>
+        IDataRow MinIdDataRow
+        {
+            get;
+        }
+
+        /// <summary>
+        /// 获取编号最大的数据表行。
+        /// </summary>
+        IDataRow MaxIdDataRow
+        {
+            get;
+        }
+
+        /// <summary>
+        /// 检查是否存在数据表行。
+        /// </summary>
+        /// <param name="id">数据表行的编号。</param>
+        /// <returns>是否存在数据表行。</returns>
+        bool HasDataRow(int id);
+
+        /// <summary>
+        /// 检查是否存在数据表行。
+        /// </summary>
+        /// <param name="condition">要检查的条件。</param>
+        /// <returns>是否存在数据表行。</returns>
+        bool HasDataRow(Predicate<IDataRow> condition);
+
+        /// <summary>
+        /// 获取数据表行。
+        /// </summary>
+        /// <param name="id">数据表行的编号。</param>
+        /// <returns>数据表行。</returns>
+        IDataRow GetDataRow(int id);
+
+        /// <summary>
+        /// 获取符合条件的数据表行。
+        /// </summary>
+        /// <param name="condition">要检查的条件。</param>
+        /// <returns>符合条件的数据表行。</returns>
+        /// <remarks>当存在多个符合条件的数据表行时，仅返回第一个符合条件的数据表行。</remarks>
+        IDataRow GetDataRow(Predicate<IDataRow> condition);
+
+        /// <summary>
+        /// 获取符合条件的数据表行。
+        /// </summary>
+        /// <param name="condition">要检查的条件。</param>
+        /// <returns>符合条件的数据表行。</returns>
+        IDataRow[] GetDataRows(Predicate<IDataRow> condition);
+
+        /// <summary>
+        /// 获取符合条件的数据表行。
+        /// </summary>
+        /// <param name="condition">要检查的条件。</param>
+        /// <param name="results">符合条件的数据表行。</param>
+        void GetDataRows(Predicate<IDataRow> condition, List<IDataRow> results);
+
+        /// <summary>
+        /// 获取排序后的数据表行。
+        /// </summary>
+        /// <param name="comparison">要排序的条件。</param>
+        /// <returns>排序后的数据表行。</returns>
+        IDataRow[] GetDataRows(Comparison<IDataRow> comparison);
+
+        /// <summary>
+        /// 获取排序后的数据表行。
+        /// </summary>
+        /// <param name="comparison">要排序的条件。</param>
+        /// <param name="results">排序后的数据表行。</param>
+        void GetDataRows(Comparison<IDataRow> comparison, List<IDataRow> results);
+
+        /// <summary>
+        /// 获取排序后的符合条件的数据表行。
+        /// </summary>
+        /// <param name="condition">要检查的条件。</param>
+        /// <param name="comparison">要排序的条件。</param>
+        /// <returns>排序后的符合条件的数据表行。</returns>
+        IDataRow[] GetDataRows(Predicate<IDataRow> condition, Comparison<IDataRow> comparison);
+
+        /// <summary>
+        /// 获取排序后的符合条件的数据表行。
+        /// </summary>
+        /// <param name="condition">要检查的条件。</param>
+        /// <param name="comparison">要排序的条件。</param>
+        /// <param name="results">排序后的符合条件的数据表行。</param>
+        void GetDataRows(Predicate<IDataRow> condition, Comparison<IDataRow> comparison, List<IDataRow> results);
+
+        /// <summary>
+        /// 获取所有数据表行。
+        /// </summary>
+        /// <returns>所有数据表行。</returns>
+        IDataRow[] GetAllDataRows();
+
+        /// <summary>
+        /// 获取所有数据表行。
+        /// </summary>
+        /// <param name="results">所有数据表行。</param>
+        void GetAllDataRows(List<IDataRow> results);
+
     }
 }
