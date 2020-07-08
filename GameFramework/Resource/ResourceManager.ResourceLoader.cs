@@ -5,6 +5,7 @@
 // Feedback: mailto:ellan@gameframework.cn
 //------------------------------------------------------------
 
+using GameFramework.FileSystem;
 using GameFramework.ObjectPool;
 using System;
 using System.Collections.Generic;
@@ -43,7 +44,7 @@ namespace GameFramework.Resource
                 m_AssetDependencyCount = new Dictionary<object, int>();
                 m_ResourceDependencyCount = new Dictionary<object, int>();
                 m_AssetToResourceMap = new Dictionary<object, object>();
-                m_SceneToAssetMap = new Dictionary<string, object>();
+                m_SceneToAssetMap = new Dictionary<string, object>(StringComparer.Ordinal);
                 m_LoadBytesCallbacks = new LoadBytesCallbacks(OnLoadBinarySuccess, OnLoadBinaryFailure);
                 m_CachedHashBytes = new byte[CachedHashBytesLength];
                 m_AssetPool = null;
@@ -280,7 +281,7 @@ namespace GameFramework.Resource
                     return resourceInfo != null && !resourceInfo.Ready ? HasAssetResult.NotReady : HasAssetResult.NotExist;
                 }
 
-                return IsLoadFromBinary(resourceInfo.LoadType) ? HasAssetResult.Binary : HasAssetResult.Asset;
+                return resourceInfo.IsLoadFromBinary ? HasAssetResult.Binary : HasAssetResult.Asset;
             }
 
             /// <summary>
@@ -307,7 +308,7 @@ namespace GameFramework.Resource
                     throw new GameFrameworkException(errorMessage);
                 }
 
-                if (IsLoadFromBinary(resourceInfo.LoadType))
+                if (resourceInfo.IsLoadFromBinary)
                 {
                     string errorMessage = Utility.Text.Format("Can not load asset '{0}' which is a binary asset.", assetName);
                     if (loadAssetCallbacks.LoadAssetFailureCallback != null)
@@ -388,7 +389,7 @@ namespace GameFramework.Resource
                     throw new GameFrameworkException(errorMessage);
                 }
 
-                if (IsLoadFromBinary(resourceInfo.LoadType))
+                if (resourceInfo.IsLoadFromBinary)
                 {
                     string errorMessage = Utility.Text.Format("Can not load scene asset '{0}' which is a binary asset.", sceneAssetName);
                     if (loadSceneCallbacks.LoadSceneFailureCallback != null)
@@ -455,6 +456,7 @@ namespace GameFramework.Resource
             /// </summary>
             /// <param name="binaryAssetName">要获取实际路径的二进制资源的名称。</param>
             /// <returns>二进制资源的实际路径。</returns>
+            /// <remarks>此方法仅适用于二进制资源存储在磁盘（而非文件系统）中的情况。若二进制资源存储在文件系统中时，返回值将始终为空。</remarks>
             public string GetBinaryPath(string binaryAssetName)
             {
                 ResourceInfo resourceInfo = null;
@@ -464,7 +466,12 @@ namespace GameFramework.Resource
                     return null;
                 }
 
-                if (!IsLoadFromBinary(resourceInfo.LoadType))
+                if (!resourceInfo.IsLoadFromBinary)
+                {
+                    return null;
+                }
+
+                if (resourceInfo.UseFileSystem)
                 {
                     return null;
                 }
@@ -476,13 +483,17 @@ namespace GameFramework.Resource
             /// 获取二进制资源的实际路径。
             /// </summary>
             /// <param name="binaryAssetName">要获取实际路径的二进制资源的名称。</param>
-            /// <param name="storageInReadOnly">资源是否在只读区。</param>
-            /// <param name="relativePath">二进制资源相对于只读区或者读写区的相对路径。</param>
-            /// <returns>获取二进制资源的实际路径是否成功。</returns>
-            public bool GetBinaryPath(string binaryAssetName, out bool storageInReadOnly, out string relativePath)
+            /// <param name="storageInReadOnly">二进制资源是否存储在只读区中。</param>
+            /// <param name="storageInFileSystem">二进制资源是否存储在文件系统中。</param>
+            /// <param name="relativePath">二进制资源或存储二进制资源的文件系统，相对于只读区或者读写区的相对路径。</param>
+            /// <param name="fileName">若二进制资源存储在文件系统中，则指示二进制资源在文件系统中的名称，否则此参数返回空。</param>
+            /// <returns>是否获取二进制资源的实际路径成功。</returns>
+            public bool GetBinaryPath(string binaryAssetName, out bool storageInReadOnly, out bool storageInFileSystem, out string relativePath, out string fileName)
             {
                 storageInReadOnly = false;
+                storageInFileSystem = false;
                 relativePath = null;
+                fileName = null;
 
                 ResourceInfo resourceInfo = null;
                 string[] dependencyAssetNames = null;
@@ -491,13 +502,23 @@ namespace GameFramework.Resource
                     return false;
                 }
 
-                if (!IsLoadFromBinary(resourceInfo.LoadType))
+                if (!resourceInfo.IsLoadFromBinary)
                 {
                     return false;
                 }
 
                 storageInReadOnly = resourceInfo.StorageInReadOnly;
-                relativePath = resourceInfo.ResourceName.FullName;
+                if (resourceInfo.UseFileSystem)
+                {
+                    storageInFileSystem = true;
+                    relativePath = Utility.Text.Format("{0}.{1}", resourceInfo.FileSystemName, DefaultExtension);
+                    fileName = resourceInfo.ResourceName.FullName;
+                }
+                else
+                {
+                    relativePath = resourceInfo.ResourceName.FullName;
+                }
+
                 return true;
             }
 
@@ -523,9 +544,9 @@ namespace GameFramework.Resource
                     throw new GameFrameworkException(errorMessage);
                 }
 
-                if (!IsLoadFromBinary(resourceInfo.LoadType))
+                if (!resourceInfo.IsLoadFromBinary)
                 {
-                    string errorMessage = Utility.Text.Format("Can not load binary asset '{0}' which is not a binary asset.", binaryAssetName);
+                    string errorMessage = Utility.Text.Format("Can not load binary '{0}' which is not a binary asset.", binaryAssetName);
                     if (loadBinaryCallbacks.LoadBinaryFailureCallback != null)
                     {
                         loadBinaryCallbacks.LoadBinaryFailureCallback(binaryAssetName, LoadResourceStatus.TypeError, errorMessage, userData);
@@ -535,8 +556,164 @@ namespace GameFramework.Resource
                     throw new GameFrameworkException(errorMessage);
                 }
 
-                string path = Utility.Path.GetRemotePath(Path.Combine(resourceInfo.StorageInReadOnly ? m_ResourceManager.m_ReadOnlyPath : m_ResourceManager.m_ReadWritePath, resourceInfo.ResourceName.FullName));
-                m_ResourceManager.m_ResourceHelper.LoadBytes(path, m_LoadBytesCallbacks, LoadBinaryInfo.Create(binaryAssetName, resourceInfo, loadBinaryCallbacks, userData));
+                if (resourceInfo.UseFileSystem)
+                {
+                    loadBinaryCallbacks.LoadBinarySuccessCallback(binaryAssetName, LoadBinaryFromFileSystem(binaryAssetName), 0f, userData);
+                }
+                else
+                {
+                    string path = Utility.Path.GetRemotePath(Path.Combine(resourceInfo.StorageInReadOnly ? m_ResourceManager.m_ReadOnlyPath : m_ResourceManager.m_ReadWritePath, resourceInfo.ResourceName.FullName));
+                    m_ResourceManager.m_ResourceHelper.LoadBytes(path, m_LoadBytesCallbacks, LoadBinaryInfo.Create(binaryAssetName, resourceInfo, loadBinaryCallbacks, userData));
+                }
+            }
+
+            /// <summary>
+            /// 从文件系统中加载二进制资源。
+            /// </summary>
+            /// <param name="binaryAssetName">要加载二进制资源的名称。</param>
+            /// <returns>存储加载二进制资源的二进制流。</returns>
+            public byte[] LoadBinaryFromFileSystem(string binaryAssetName)
+            {
+                ResourceInfo resourceInfo = null;
+                string[] dependencyAssetNames = null;
+                if (!CheckAsset(binaryAssetName, out resourceInfo, out dependencyAssetNames))
+                {
+                    throw new GameFrameworkException(Utility.Text.Format("Can not load binary '{0}' from file system which is '{1}'.", binaryAssetName, resourceInfo != null && !resourceInfo.Ready ? LoadResourceStatus.NotReady.ToString() : LoadResourceStatus.NotExist.ToString()));
+                }
+
+                if (!resourceInfo.IsLoadFromBinary)
+                {
+                    throw new GameFrameworkException(Utility.Text.Format("Can not load binary '{0}' from file system which is not a binary asset.", binaryAssetName));
+                }
+
+                if (!resourceInfo.UseFileSystem)
+                {
+                    throw new GameFrameworkException(Utility.Text.Format("Can not load binary '{0}' from file system which is not use file system.", binaryAssetName));
+                }
+
+                IFileSystem fileSystem = m_ResourceManager.GetFileSystem(resourceInfo.FileSystemName, resourceInfo.StorageInReadOnly);
+                byte[] bytes = fileSystem.ReadFile(resourceInfo.ResourceName.FullName);
+                if (resourceInfo.LoadType == LoadType.LoadFromBinaryAndQuickDecrypt || resourceInfo.LoadType == LoadType.LoadFromBinaryAndDecrypt)
+                {
+                    DecryptResourceCallback decryptResourceCallback = m_ResourceManager.m_DecryptResourceCallback ?? DefaultDecryptResourceCallback;
+                    decryptResourceCallback(bytes, 0, bytes.Length, resourceInfo.ResourceName.Name, resourceInfo.ResourceName.Variant, resourceInfo.ResourceName.Extension, resourceInfo.StorageInReadOnly, resourceInfo.FileSystemName, (byte)resourceInfo.LoadType, resourceInfo.Length, resourceInfo.HashCode);
+                }
+
+                return bytes;
+            }
+
+            /// <summary>
+            /// 从文件系统中加载二进制资源。
+            /// </summary>
+            /// <param name="binaryAssetName">要加载二进制资源的名称。</param>
+            /// <param name="buffer">存储加载二进制资源的二进制流。</param>
+            /// <param name="startIndex">存储加载二进制资源的二进制流的起始位置。</param>
+            /// <param name="length">存储加载二进制资源的二进制流的长度。</param>
+            /// <returns>实际加载了多少字节。</returns>
+            public int LoadBinaryFromFileSystem(string binaryAssetName, byte[] buffer, int startIndex, int length)
+            {
+                ResourceInfo resourceInfo = null;
+                string[] dependencyAssetNames = null;
+                if (!CheckAsset(binaryAssetName, out resourceInfo, out dependencyAssetNames))
+                {
+                    throw new GameFrameworkException(Utility.Text.Format("Can not load binary '{0}' from file system which is '{1}'.", binaryAssetName, resourceInfo != null && !resourceInfo.Ready ? LoadResourceStatus.NotReady.ToString() : LoadResourceStatus.NotExist.ToString()));
+                }
+
+                if (!resourceInfo.IsLoadFromBinary)
+                {
+                    throw new GameFrameworkException(Utility.Text.Format("Can not load binary '{0}' from file system which is not a binary asset.", binaryAssetName));
+                }
+
+                if (!resourceInfo.UseFileSystem)
+                {
+                    throw new GameFrameworkException(Utility.Text.Format("Can not load binary '{0}' from file system which is not use file system.", binaryAssetName));
+                }
+
+                IFileSystem fileSystem = m_ResourceManager.GetFileSystem(resourceInfo.FileSystemName, resourceInfo.StorageInReadOnly);
+                int bytesRead = fileSystem.ReadFile(resourceInfo.ResourceName.FullName, buffer, startIndex, length);
+                if (resourceInfo.LoadType == LoadType.LoadFromBinaryAndQuickDecrypt || resourceInfo.LoadType == LoadType.LoadFromBinaryAndDecrypt)
+                {
+                    DecryptResourceCallback decryptResourceCallback = m_ResourceManager.m_DecryptResourceCallback ?? DefaultDecryptResourceCallback;
+                    decryptResourceCallback(buffer, startIndex, bytesRead, resourceInfo.ResourceName.Name, resourceInfo.ResourceName.Variant, resourceInfo.ResourceName.Extension, resourceInfo.StorageInReadOnly, resourceInfo.FileSystemName, (byte)resourceInfo.LoadType, resourceInfo.Length, resourceInfo.HashCode);
+                }
+
+                return bytesRead;
+            }
+
+            /// <summary>
+            /// 从文件系统中加载二进制资源的片段。
+            /// </summary>
+            /// <param name="binaryAssetName">要加载片段的二进制资源的名称。</param>
+            /// <param name="offset">要加载片段的偏移。</param>
+            /// <param name="length">要加载片段的长度。</param>
+            /// <returns>存储加载二进制资源片段内容的二进制流。</returns>
+            public byte[] LoadBinarySegmentFromFileSystem(string binaryAssetName, int offset, int length)
+            {
+                ResourceInfo resourceInfo = null;
+                string[] dependencyAssetNames = null;
+                if (!CheckAsset(binaryAssetName, out resourceInfo, out dependencyAssetNames))
+                {
+                    throw new GameFrameworkException(Utility.Text.Format("Can not load binary '{0}' from file system which is '{1}'.", binaryAssetName, resourceInfo != null && !resourceInfo.Ready ? LoadResourceStatus.NotReady.ToString() : LoadResourceStatus.NotExist.ToString()));
+                }
+
+                if (!resourceInfo.IsLoadFromBinary)
+                {
+                    throw new GameFrameworkException(Utility.Text.Format("Can not load binary '{0}' from file system which is not a binary asset.", binaryAssetName));
+                }
+
+                if (!resourceInfo.UseFileSystem)
+                {
+                    throw new GameFrameworkException(Utility.Text.Format("Can not load binary '{0}' from file system which is not use file system.", binaryAssetName));
+                }
+
+                IFileSystem fileSystem = m_ResourceManager.GetFileSystem(resourceInfo.FileSystemName, resourceInfo.StorageInReadOnly);
+                byte[] bytes = fileSystem.ReadFileSegment(resourceInfo.ResourceName.FullName, offset, length);
+                if (resourceInfo.LoadType == LoadType.LoadFromBinaryAndQuickDecrypt || resourceInfo.LoadType == LoadType.LoadFromBinaryAndDecrypt)
+                {
+                    DecryptResourceCallback decryptResourceCallback = m_ResourceManager.m_DecryptResourceCallback ?? DefaultDecryptResourceCallback;
+                    decryptResourceCallback(bytes, 0, bytes.Length, resourceInfo.ResourceName.Name, resourceInfo.ResourceName.Variant, resourceInfo.ResourceName.Extension, resourceInfo.StorageInReadOnly, resourceInfo.FileSystemName, (byte)resourceInfo.LoadType, resourceInfo.Length, resourceInfo.HashCode);
+                }
+
+                return bytes;
+            }
+
+            /// <summary>
+            /// 从文件系统中加载二进制资源的片段。
+            /// </summary>
+            /// <param name="binaryAssetName">要加载片段的二进制资源的名称。</param>
+            /// <param name="offset">要加载片段的偏移。</param>
+            /// <param name="buffer">存储加载二进制资源片段内容的二进制流。</param>
+            /// <param name="startIndex">存储加载二进制资源片段内容的二进制流的起始位置。</param>
+            /// <param name="length">要加载片段的长度。</param>
+            /// <returns>实际加载了多少字节。</returns>
+            public int LoadBinarySegmentFromFileSystem(string binaryAssetName, int offset, byte[] buffer, int startIndex, int length)
+            {
+                ResourceInfo resourceInfo = null;
+                string[] dependencyAssetNames = null;
+                if (!CheckAsset(binaryAssetName, out resourceInfo, out dependencyAssetNames))
+                {
+                    throw new GameFrameworkException(Utility.Text.Format("Can not load binary '{0}' from file system which is '{1}'.", binaryAssetName, resourceInfo != null && !resourceInfo.Ready ? LoadResourceStatus.NotReady.ToString() : LoadResourceStatus.NotExist.ToString()));
+                }
+
+                if (!resourceInfo.IsLoadFromBinary)
+                {
+                    throw new GameFrameworkException(Utility.Text.Format("Can not load binary '{0}' from file system which is not a binary asset.", binaryAssetName));
+                }
+
+                if (!resourceInfo.UseFileSystem)
+                {
+                    throw new GameFrameworkException(Utility.Text.Format("Can not load binary '{0}' from file system which is not use file system.", binaryAssetName));
+                }
+
+                IFileSystem fileSystem = m_ResourceManager.GetFileSystem(resourceInfo.FileSystemName, resourceInfo.StorageInReadOnly);
+                int bytesRead = fileSystem.ReadFileSegment(resourceInfo.ResourceName.FullName, offset, buffer, startIndex, length);
+                if (resourceInfo.LoadType == LoadType.LoadFromBinaryAndQuickDecrypt || resourceInfo.LoadType == LoadType.LoadFromBinaryAndDecrypt)
+                {
+                    DecryptResourceCallback decryptResourceCallback = m_ResourceManager.m_DecryptResourceCallback ?? DefaultDecryptResourceCallback;
+                    decryptResourceCallback(buffer, startIndex, bytesRead, resourceInfo.ResourceName.Name, resourceInfo.ResourceName.Variant, resourceInfo.ResourceName.Extension, resourceInfo.StorageInReadOnly, resourceInfo.FileSystemName, (byte)resourceInfo.LoadType, resourceInfo.Length, resourceInfo.HashCode);
+                }
+
+                return bytesRead;
             }
 
             /// <summary>
@@ -562,7 +739,7 @@ namespace GameFramework.Resource
                     return false;
                 }
 
-                if (IsLoadFromBinary(resourceInfo.LoadType))
+                if (resourceInfo.IsLoadFromBinary)
                 {
                     return false;
                 }
@@ -583,11 +760,6 @@ namespace GameFramework.Resource
                 }
 
                 return true;
-            }
-
-            private bool IsLoadFromBinary(LoadType loadType)
-            {
-                return loadType == LoadType.LoadFromBinary || loadType == LoadType.LoadFromBinaryAndQuickDecrypt || loadType == LoadType.LoadFromBinaryAndDecrypt;
             }
 
             private bool CheckAsset(string assetName, out ResourceInfo resourceInfo, out string[] dependencyAssetNames)
@@ -616,27 +788,26 @@ namespace GameFramework.Resource
                 return m_ResourceManager.m_ResourceMode == ResourceMode.UpdatableWhilePlaying ? true : resourceInfo.Ready;
             }
 
-            private byte[] DefaultDecryptResourceCallback(string name, string variant, byte loadType, int length, int hashCode, bool storageInReadOnly, byte[] bytes)
+            private void DefaultDecryptResourceCallback(byte[] bytes, int startIndex, int count, string name, string variant, string extension, bool storageInReadOnly, string fileSystem, byte loadType, int length, int hashCode)
             {
+                Utility.Converter.GetBytes(hashCode, m_CachedHashBytes);
                 switch ((LoadType)loadType)
                 {
                     case LoadType.LoadFromMemoryAndQuickDecrypt:
                     case LoadType.LoadFromBinaryAndQuickDecrypt:
-                        Utility.Converter.GetBytes(hashCode, m_CachedHashBytes);
                         Utility.Encryption.GetQuickSelfXorBytes(bytes, m_CachedHashBytes);
-                        Array.Clear(m_CachedHashBytes, 0, CachedHashBytesLength);
-                        return bytes;
+                        break;
 
                     case LoadType.LoadFromMemoryAndDecrypt:
                     case LoadType.LoadFromBinaryAndDecrypt:
-                        Utility.Converter.GetBytes(hashCode, m_CachedHashBytes);
                         Utility.Encryption.GetSelfXorBytes(bytes, m_CachedHashBytes);
-                        Array.Clear(m_CachedHashBytes, 0, CachedHashBytesLength);
-                        return bytes;
+                        break;
 
                     default:
-                        return bytes;
+                        throw new GameFrameworkException("Not supported load type when decrypt resource.");
                 }
+
+                Array.Clear(m_CachedHashBytes, 0, CachedHashBytesLength);
             }
 
             private void OnLoadBinarySuccess(string fileUri, byte[] bytes, float duration, object userData)
@@ -647,10 +818,11 @@ namespace GameFramework.Resource
                     throw new GameFrameworkException("Load binary info is invalid.");
                 }
 
-                if (loadBinaryInfo.ResourceInfo.LoadType == LoadType.LoadFromBinaryAndQuickDecrypt || loadBinaryInfo.ResourceInfo.LoadType == LoadType.LoadFromBinaryAndDecrypt)
+                ResourceInfo resourceInfo = loadBinaryInfo.ResourceInfo;
+                if (resourceInfo.LoadType == LoadType.LoadFromBinaryAndQuickDecrypt || resourceInfo.LoadType == LoadType.LoadFromBinaryAndDecrypt)
                 {
                     DecryptResourceCallback decryptResourceCallback = m_ResourceManager.m_DecryptResourceCallback ?? DefaultDecryptResourceCallback;
-                    bytes = decryptResourceCallback(loadBinaryInfo.ResourceInfo.ResourceName.Name, loadBinaryInfo.ResourceInfo.ResourceName.Variant, (byte)loadBinaryInfo.ResourceInfo.LoadType, loadBinaryInfo.ResourceInfo.Length, loadBinaryInfo.ResourceInfo.HashCode, loadBinaryInfo.ResourceInfo.StorageInReadOnly, bytes);
+                    decryptResourceCallback(bytes, 0, bytes.Length, resourceInfo.ResourceName.Name, resourceInfo.ResourceName.Variant, resourceInfo.ResourceName.Extension, resourceInfo.StorageInReadOnly, resourceInfo.FileSystemName, (byte)resourceInfo.LoadType, resourceInfo.Length, resourceInfo.HashCode);
                 }
 
                 loadBinaryInfo.LoadBinaryCallbacks.LoadBinarySuccessCallback(loadBinaryInfo.BinaryAssetName, bytes, duration, loadBinaryInfo.UserData);

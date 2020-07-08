@@ -6,6 +6,7 @@
 //------------------------------------------------------------
 
 using GameFramework.Download;
+using GameFramework.FileSystem;
 using GameFramework.ObjectPool;
 using System;
 using System.Collections.Generic;
@@ -22,11 +23,15 @@ namespace GameFramework.Resource
         private const string LocalVersionListFileName = "GameFrameworkList.dat";
         private const string DefaultExtension = "dat";
         private const string BackupExtension = "bak";
+        private const int FileSystemMaxFileCount = 1024 * 16;
+        private const int FileSystemMaxBlockCount = 1024 * 256;
 
         private Dictionary<string, AssetInfo> m_AssetInfos;
         private Dictionary<ResourceName, ResourceInfo> m_ResourceInfos;
+        private SortedDictionary<ResourceName, ReadWriteResourceInfo> m_ReadWriteResourceInfos;
+        private readonly Dictionary<string, IFileSystem> m_ReadOnlyFileSystems;
+        private readonly Dictionary<string, IFileSystem> m_ReadWriteFileSystems;
         private readonly Dictionary<string, ResourceGroup> m_ResourceGroups;
-        private readonly SortedDictionary<ResourceName, ReadWriteResourceInfo> m_ReadWriteResourceInfos;
 
         private PackageVersionListSerializer m_PackageVersionListSerializer;
         private UpdatableVersionListSerializer m_UpdatableVersionListSerializer;
@@ -34,6 +39,7 @@ namespace GameFramework.Resource
         private ReadWriteVersionListSerializer m_ReadWriteVersionListSerializer;
         private ResourcePackVersionListSerializer m_ResourcePackVersionListSerializer;
 
+        private IFileSystemManager m_FileSystemManager;
         private ResourceIniter m_ResourceIniter;
         private VersionListProcessor m_VersionListProcessor;
         private ResourceChecker m_ResourceChecker;
@@ -70,8 +76,10 @@ namespace GameFramework.Resource
         {
             m_AssetInfos = null;
             m_ResourceInfos = null;
-            m_ResourceGroups = new Dictionary<string, ResourceGroup>();
-            m_ReadWriteResourceInfos = new SortedDictionary<ResourceName, ReadWriteResourceInfo>(new ResourceNameComparer());
+            m_ReadWriteResourceInfos = null;
+            m_ReadOnlyFileSystems = new Dictionary<string, IFileSystem>(StringComparer.Ordinal);
+            m_ReadWriteFileSystems = new Dictionary<string, IFileSystem>(StringComparer.Ordinal);
+            m_ResourceGroups = new Dictionary<string, ResourceGroup>(StringComparer.Ordinal);
 
             m_PackageVersionListSerializer = null;
             m_UpdatableVersionListSerializer = null;
@@ -705,6 +713,10 @@ namespace GameFramework.Resource
                 m_ResourceUpdater.ResourceUpdateComplete -= OnUpdaterResourceUpdateComplete;
                 m_ResourceUpdater.Shutdown();
                 m_ResourceUpdater = null;
+
+                m_ReadWriteResourceInfos.Clear();
+                m_ReadWriteResourceInfos = null;
+
                 if (m_DecompressCachedStream != null)
                 {
                     m_DecompressCachedStream.Dispose();
@@ -730,8 +742,9 @@ namespace GameFramework.Resource
                 m_ResourceInfos = null;
             }
 
+            m_ReadOnlyFileSystems.Clear();
+            m_ReadWriteFileSystems.Clear();
             m_ResourceGroups.Clear();
-            m_ReadWriteResourceInfos.Clear();
         }
 
         /// <summary>
@@ -852,6 +865,20 @@ namespace GameFramework.Resource
             }
 
             m_ResourceLoader.SetObjectPoolManager(objectPoolManager);
+        }
+
+        /// <summary>
+        /// 设置文件系统管理器。
+        /// </summary>
+        /// <param name="fileSystemManager">文件系统管理器。</param>
+        public void SetFileSystemManager(IFileSystemManager fileSystemManager)
+        {
+            if (fileSystemManager == null)
+            {
+                throw new GameFrameworkException("File system manager is invalid.");
+            }
+
+            m_FileSystemManager = fileSystemManager;
         }
 
         /// <summary>
@@ -1027,8 +1054,9 @@ namespace GameFramework.Resource
         /// <summary>
         /// 使用可更新模式并检查资源。
         /// </summary>
+        /// <param name="ignoreOtherVariant">是否忽略处理其它变体的资源，若不忽略，将会移除其它变体的资源。</param>
         /// <param name="checkResourcesCompleteCallback">使用可更新模式并检查资源完成时的回调函数。</param>
-        public void CheckResources(CheckResourcesCompleteCallback checkResourcesCompleteCallback)
+        public void CheckResources(bool ignoreOtherVariant, CheckResourcesCompleteCallback checkResourcesCompleteCallback)
         {
             if (checkResourcesCompleteCallback == null)
             {
@@ -1052,7 +1080,7 @@ namespace GameFramework.Resource
 
             m_RefuseSetCurrentVariant = true;
             m_CheckResourcesCompleteCallback = checkResourcesCompleteCallback;
-            m_ResourceChecker.CheckResources(m_CurrentVariant);
+            m_ResourceChecker.CheckResources(m_CurrentVariant, ignoreOtherVariant);
         }
 
         /// <summary>
@@ -1146,7 +1174,7 @@ namespace GameFramework.Resource
         /// 校验资源包。
         /// </summary>
         /// <param name="resourcePackPath">要校验的资源包路径。</param>
-        /// <returns></returns>
+        /// <returns>是否校验资源包成功。</returns>
         public bool VerifyResourcePack(string resourcePackPath)
         {
             if (string.IsNullOrEmpty(resourcePackPath))
@@ -1570,6 +1598,7 @@ namespace GameFramework.Resource
         /// </summary>
         /// <param name="binaryAssetName">要获取实际路径的二进制资源的名称。</param>
         /// <returns>二进制资源的实际路径。</returns>
+        /// <remarks>此方法仅适用于二进制资源存储在磁盘（而非文件系统）中的情况。若二进制资源存储在文件系统中时，返回值将始终为空。</remarks>
         public string GetBinaryPath(string binaryAssetName)
         {
             if (string.IsNullOrEmpty(binaryAssetName))
@@ -1584,12 +1613,14 @@ namespace GameFramework.Resource
         /// 获取二进制资源的实际路径。
         /// </summary>
         /// <param name="binaryAssetName">要获取实际路径的二进制资源的名称。</param>
-        /// <param name="storageInReadOnly">资源是否在只读区。</param>
-        /// <param name="relativePath">二进制资源相对于只读区或者读写区的相对路径。</param>
-        /// <returns>获取二进制资源的实际路径是否成功。</returns>
-        public bool GetBinaryPath(string binaryAssetName, out bool storageInReadOnly, out string relativePath)
+        /// <param name="storageInReadOnly">二进制资源是否存储在只读区中。</param>
+        /// <param name="storageInFileSystem">二进制资源是否存储在文件系统中。</param>
+        /// <param name="relativePath">二进制资源或存储二进制资源的文件系统，相对于只读区或者读写区的相对路径。</param>
+        /// <param name="fileName">若二进制资源存储在文件系统中，则指示二进制资源在文件系统中的名称，否则此参数返回空。</param>
+        /// <returns>是否获取二进制资源的实际路径成功。</returns>
+        public bool GetBinaryPath(string binaryAssetName, out bool storageInReadOnly, out bool storageInFileSystem, out string relativePath, out string fileName)
         {
-            return m_ResourceLoader.GetBinaryPath(binaryAssetName, out storageInReadOnly, out relativePath);
+            return m_ResourceLoader.GetBinaryPath(binaryAssetName, out storageInReadOnly, out storageInFileSystem, out relativePath, out fileName);
         }
 
         /// <summary>
@@ -1631,6 +1662,212 @@ namespace GameFramework.Resource
             }
 
             m_ResourceLoader.LoadBinary(binaryAssetName, loadBinaryCallbacks, userData);
+        }
+
+        /// <summary>
+        /// 从文件系统中加载二进制资源。
+        /// </summary>
+        /// <param name="binaryAssetName">要加载二进制资源的名称。</param>
+        /// <returns>存储加载二进制资源的二进制流。</returns>
+        public byte[] LoadBinaryFromFileSystem(string binaryAssetName)
+        {
+            if (string.IsNullOrEmpty(binaryAssetName))
+            {
+                throw new GameFrameworkException("Binary asset name is invalid.");
+            }
+
+            return m_ResourceLoader.LoadBinaryFromFileSystem(binaryAssetName);
+        }
+
+        /// <summary>
+        /// 从文件系统中加载二进制资源。
+        /// </summary>
+        /// <param name="binaryAssetName">要加载二进制资源的名称。</param>
+        /// <param name="buffer">存储加载二进制资源的二进制流。</param>
+        /// <returns>实际加载了多少字节。</returns>
+        public int LoadBinaryFromFileSystem(string binaryAssetName, byte[] buffer)
+        {
+            if (string.IsNullOrEmpty(binaryAssetName))
+            {
+                throw new GameFrameworkException("Binary asset name is invalid.");
+            }
+
+            if (buffer == null)
+            {
+                throw new GameFrameworkException("Buffer is invalid.");
+            }
+
+            return m_ResourceLoader.LoadBinaryFromFileSystem(binaryAssetName, buffer, 0, buffer.Length);
+        }
+
+        /// <summary>
+        /// 从文件系统中加载二进制资源。
+        /// </summary>
+        /// <param name="binaryAssetName">要加载二进制资源的名称。</param>
+        /// <param name="buffer">存储加载二进制资源的二进制流。</param>
+        /// <param name="startIndex">存储加载二进制资源的二进制流的起始位置。</param>
+        /// <returns>实际加载了多少字节。</returns>
+        public int LoadBinaryFromFileSystem(string binaryAssetName, byte[] buffer, int startIndex)
+        {
+            if (string.IsNullOrEmpty(binaryAssetName))
+            {
+                throw new GameFrameworkException("Binary asset name is invalid.");
+            }
+
+            if (buffer == null)
+            {
+                throw new GameFrameworkException("Buffer is invalid.");
+            }
+
+            return m_ResourceLoader.LoadBinaryFromFileSystem(binaryAssetName, buffer, startIndex, buffer.Length - startIndex);
+        }
+
+        /// <summary>
+        /// 从文件系统中加载二进制资源。
+        /// </summary>
+        /// <param name="binaryAssetName">要加载二进制资源的名称。</param>
+        /// <param name="buffer">存储加载二进制资源的二进制流。</param>
+        /// <param name="startIndex">存储加载二进制资源的二进制流的起始位置。</param>
+        /// <param name="length">存储加载二进制资源的二进制流的长度。</param>
+        /// <returns>实际加载了多少字节。</returns>
+        public int LoadBinaryFromFileSystem(string binaryAssetName, byte[] buffer, int startIndex, int length)
+        {
+            if (string.IsNullOrEmpty(binaryAssetName))
+            {
+                throw new GameFrameworkException("Binary asset name is invalid.");
+            }
+
+            if (buffer == null)
+            {
+                throw new GameFrameworkException("Buffer is invalid.");
+            }
+
+            return m_ResourceLoader.LoadBinaryFromFileSystem(binaryAssetName, buffer, startIndex, length);
+        }
+
+        /// <summary>
+        /// 从文件系统中加载二进制资源的片段。
+        /// </summary>
+        /// <param name="binaryAssetName">要加载片段的二进制资源的名称。</param>
+        /// <param name="length">要加载片段的长度。</param>
+        /// <returns>存储加载二进制资源片段内容的二进制流。</returns>
+        public byte[] LoadBinarySegmentFromFileSystem(string binaryAssetName, int length)
+        {
+            if (string.IsNullOrEmpty(binaryAssetName))
+            {
+                throw new GameFrameworkException("Binary asset name is invalid.");
+            }
+
+            return m_ResourceLoader.LoadBinarySegmentFromFileSystem(binaryAssetName, 0, length);
+        }
+
+        /// <summary>
+        /// 从文件系统中加载二进制资源的片段。
+        /// </summary>
+        /// <param name="binaryAssetName">要加载片段的二进制资源的名称。</param>
+        /// <param name="offset">要加载片段的偏移。</param>
+        /// <param name="length">要加载片段的长度。</param>
+        /// <returns>存储加载二进制资源片段内容的二进制流。</returns>
+        public byte[] LoadBinarySegmentFromFileSystem(string binaryAssetName, int offset, int length)
+        {
+            if (string.IsNullOrEmpty(binaryAssetName))
+            {
+                throw new GameFrameworkException("Binary asset name is invalid.");
+            }
+
+            return m_ResourceLoader.LoadBinarySegmentFromFileSystem(binaryAssetName, offset, length);
+        }
+
+        /// <summary>
+        /// 从文件系统中加载二进制资源的片段。
+        /// </summary>
+        /// <param name="binaryAssetName">要加载片段的二进制资源的名称。</param>
+        /// <param name="buffer">存储加载二进制资源片段内容的二进制流。</param>
+        /// <param name="length">要加载片段的长度。</param>
+        /// <returns>实际加载了多少字节。</returns>
+        public int LoadBinarySegmentFromFileSystem(string binaryAssetName, byte[] buffer, int length)
+        {
+            if (string.IsNullOrEmpty(binaryAssetName))
+            {
+                throw new GameFrameworkException("Binary asset name is invalid.");
+            }
+
+            if (buffer == null)
+            {
+                throw new GameFrameworkException("Buffer is invalid.");
+            }
+
+            return m_ResourceLoader.LoadBinarySegmentFromFileSystem(binaryAssetName, 0, buffer, 0, length);
+        }
+
+        /// <summary>
+        /// 从文件系统中加载二进制资源的片段。
+        /// </summary>
+        /// <param name="binaryAssetName">要加载片段的二进制资源的名称。</param>
+        /// <param name="buffer">存储加载二进制资源片段内容的二进制流。</param>
+        /// <param name="startIndex">存储加载二进制资源片段内容的二进制流的起始位置。</param>
+        /// <param name="length">要加载片段的长度。</param>
+        /// <returns>实际加载了多少字节。</returns>
+        public int LoadBinarySegmentFromFileSystem(string binaryAssetName, byte[] buffer, int startIndex, int length)
+        {
+            if (string.IsNullOrEmpty(binaryAssetName))
+            {
+                throw new GameFrameworkException("Binary asset name is invalid.");
+            }
+
+            if (buffer == null)
+            {
+                throw new GameFrameworkException("Buffer is invalid.");
+            }
+
+            return m_ResourceLoader.LoadBinarySegmentFromFileSystem(binaryAssetName, 0, buffer, startIndex, length);
+        }
+
+        /// <summary>
+        /// 从文件系统中加载二进制资源的片段。
+        /// </summary>
+        /// <param name="binaryAssetName">要加载片段的二进制资源的名称。</param>
+        /// <param name="offset">要加载片段的偏移。</param>
+        /// <param name="buffer">存储加载二进制资源片段内容的二进制流。</param>
+        /// <param name="length">要加载片段的长度。</param>
+        /// <returns>实际加载了多少字节。</returns>
+        public int LoadBinarySegmentFromFileSystem(string binaryAssetName, int offset, byte[] buffer, int length)
+        {
+            if (string.IsNullOrEmpty(binaryAssetName))
+            {
+                throw new GameFrameworkException("Binary asset name is invalid.");
+            }
+
+            if (buffer == null)
+            {
+                throw new GameFrameworkException("Buffer is invalid.");
+            }
+
+            return m_ResourceLoader.LoadBinarySegmentFromFileSystem(binaryAssetName, offset, buffer, 0, length);
+        }
+
+        /// <summary>
+        /// 从文件系统中加载二进制资源的片段。
+        /// </summary>
+        /// <param name="binaryAssetName">要加载片段的二进制资源的名称。</param>
+        /// <param name="offset">要加载片段的偏移。</param>
+        /// <param name="buffer">存储加载二进制资源片段内容的二进制流。</param>
+        /// <param name="startIndex">存储加载二进制资源片段内容的二进制流的起始位置。</param>
+        /// <param name="length">要加载片段的长度。</param>
+        /// <returns>实际加载了多少字节。</returns>
+        public int LoadBinarySegmentFromFileSystem(string binaryAssetName, int offset, byte[] buffer, int startIndex, int length)
+        {
+            if (string.IsNullOrEmpty(binaryAssetName))
+            {
+                throw new GameFrameworkException("Binary asset name is invalid.");
+            }
+
+            if (buffer == null)
+            {
+                throw new GameFrameworkException("Buffer is invalid.");
+            }
+
+            return m_ResourceLoader.LoadBinarySegmentFromFileSystem(binaryAssetName, offset, buffer, startIndex, length);
         }
 
         /// <summary>
@@ -1736,6 +1973,58 @@ namespace GameFramework.Resource
             return null;
         }
 
+        private IFileSystem GetFileSystem(string fileSystemName, bool storageInReadOnly)
+        {
+            if (string.IsNullOrEmpty(fileSystemName))
+            {
+                throw new GameFrameworkException("File system name is invalid.");
+            }
+
+            IFileSystem fileSystem = null;
+            if (storageInReadOnly)
+            {
+                if (!m_ReadOnlyFileSystems.TryGetValue(fileSystemName, out fileSystem))
+                {
+                    string fullPath = Utility.Path.GetRegularPath(Path.Combine(m_ReadOnlyPath, Utility.Text.Format("{0}.{1}", fileSystemName, DefaultExtension)));
+                    fileSystem = m_FileSystemManager.GetFileSystem(fullPath);
+                    if (fileSystem == null)
+                    {
+                        fileSystem = m_FileSystemManager.LoadFileSystem(fullPath, FileSystemAccess.Read);
+                        m_ReadOnlyFileSystems.Add(fileSystemName, fileSystem);
+                    }
+                }
+            }
+            else
+            {
+                if (!m_ReadWriteFileSystems.TryGetValue(fileSystemName, out fileSystem))
+                {
+                    string fullPath = Utility.Path.GetRegularPath(Path.Combine(m_ReadWritePath, Utility.Text.Format("{0}.{1}", fileSystemName, DefaultExtension)));
+                    fileSystem = m_FileSystemManager.GetFileSystem(fullPath);
+                    if (fileSystem == null)
+                    {
+                        if (File.Exists(fullPath))
+                        {
+                            fileSystem = m_FileSystemManager.LoadFileSystem(fullPath, FileSystemAccess.ReadWrite);
+                        }
+                        else
+                        {
+                            string directory = Path.GetDirectoryName(fullPath);
+                            if (!Directory.Exists(directory))
+                            {
+                                Directory.CreateDirectory(directory);
+                            }
+
+                            fileSystem = m_FileSystemManager.CreateFileSystem(fullPath, FileSystemAccess.ReadWrite, FileSystemMaxFileCount, FileSystemMaxBlockCount);
+                        }
+
+                        m_ReadWriteFileSystems.Add(fileSystemName, fileSystem);
+                    }
+                }
+            }
+
+            return fileSystem;
+        }
+
         private void OnIniterResourceInitComplete()
         {
             m_ResourceIniter.ResourceInitComplete -= OnIniterResourceInitComplete;
@@ -1759,12 +2048,12 @@ namespace GameFramework.Resource
             }
         }
 
-        private void OnCheckerResourceNeedUpdate(ResourceName resourceName, LoadType loadType, int length, int hashCode, int zipLength, int zipHashCode)
+        private void OnCheckerResourceNeedUpdate(ResourceName resourceName, string fileSystemName, LoadType loadType, int length, int hashCode, int zipLength, int zipHashCode)
         {
-            m_ResourceUpdater.AddResourceUpdate(resourceName, loadType, length, hashCode, zipLength, zipHashCode, Utility.Path.GetRegularPath(Path.Combine(m_ReadWritePath, resourceName.FullName)));
+            m_ResourceUpdater.AddResourceUpdate(resourceName, fileSystemName, loadType, length, hashCode, zipLength, zipHashCode, Utility.Path.GetRegularPath(Path.Combine(m_ReadWritePath, resourceName.FullName)));
         }
 
-        private void OnCheckerResourceCheckComplete(int removedCount, int updateCount, long updateTotalLength, long updateTotalZipLength)
+        private void OnCheckerResourceCheckComplete(int movedCount, int removedCount, int updateCount, long updateTotalLength, long updateTotalZipLength)
         {
             m_VersionListProcessor.VersionListUpdateSuccess -= OnVersionListProcessorUpdateSuccess;
             m_VersionListProcessor.VersionListUpdateFailure -= OnVersionListProcessorUpdateFailure;
@@ -1777,7 +2066,7 @@ namespace GameFramework.Resource
             m_ResourceChecker.Shutdown();
             m_ResourceChecker = null;
 
-            m_ResourceUpdater.CheckResourceComplete(removedCount > 0);
+            m_ResourceUpdater.CheckResourceComplete(movedCount > 0 || removedCount > 0);
 
             if (updateCount <= 0)
             {
@@ -1791,6 +2080,10 @@ namespace GameFramework.Resource
                 m_ResourceUpdater.ResourceUpdateComplete -= OnUpdaterResourceUpdateComplete;
                 m_ResourceUpdater.Shutdown();
                 m_ResourceUpdater = null;
+
+                m_ReadWriteResourceInfos.Clear();
+                m_ReadWriteResourceInfos = null;
+
                 if (m_DecompressCachedStream != null)
                 {
                     m_DecompressCachedStream.Dispose();
@@ -1798,7 +2091,7 @@ namespace GameFramework.Resource
                 }
             }
 
-            m_CheckResourcesCompleteCallback(removedCount, updateCount, updateTotalLength, updateTotalZipLength);
+            m_CheckResourcesCompleteCallback(movedCount, removedCount, updateCount, updateTotalLength, updateTotalZipLength);
             m_CheckResourcesCompleteCallback = null;
         }
 
@@ -1836,11 +2129,17 @@ namespace GameFramework.Resource
                 m_ResourceUpdater.ResourceUpdateComplete -= OnUpdaterResourceUpdateComplete;
                 m_ResourceUpdater.Shutdown();
                 m_ResourceUpdater = null;
+
+                m_ReadWriteResourceInfos.Clear();
+                m_ReadWriteResourceInfos = null;
+
                 if (m_DecompressCachedStream != null)
                 {
                     m_DecompressCachedStream.Dispose();
                     m_DecompressCachedStream = null;
                 }
+
+                Utility.Path.RemoveEmptyDirectory(m_ReadWritePath);
             }
 
             ApplyResourcesCompleteCallback applyResourcesCompleteCallback = m_ApplyResourcesCompleteCallback;
@@ -1902,11 +2201,17 @@ namespace GameFramework.Resource
                 m_ResourceUpdater.ResourceUpdateComplete -= OnUpdaterResourceUpdateComplete;
                 m_ResourceUpdater.Shutdown();
                 m_ResourceUpdater = null;
+
+                m_ReadWriteResourceInfos.Clear();
+                m_ReadWriteResourceInfos = null;
+
                 if (m_DecompressCachedStream != null)
                 {
                     m_DecompressCachedStream.Dispose();
                     m_DecompressCachedStream = null;
                 }
+
+                Utility.Path.RemoveEmptyDirectory(m_ReadWritePath);
             }
 
             UpdateResourcesCompleteCallback updateResourcesCompleteCallback = m_UpdateResourcesCompleteCallback;

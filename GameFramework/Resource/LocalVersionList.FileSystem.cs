@@ -7,36 +7,36 @@
 
 namespace GameFramework.Resource
 {
-    public partial struct UpdatableVersionList
+    public partial struct LocalVersionList
     {
         /// <summary>
-        /// 资源。
+        /// 文件系统。
         /// </summary>
-        public struct Asset
+        public struct FileSystem
         {
             private static readonly int[] EmptyIntArray = new int[] { };
 
             private readonly string m_Name;
-            private readonly int[] m_DependencyAssetIndexes;
+            private readonly int[] m_ResourceIndexes;
 
             /// <summary>
-            /// 初始化资源的新实例。
+            /// 初始化文件系统的新实例。
             /// </summary>
-            /// <param name="name">资源名称。</param>
-            /// <param name="dependencyAssetIndexes">资源包含的依赖资源索引集合。</param>
-            public Asset(string name, int[] dependencyAssetIndexes)
+            /// <param name="name">文件系统名称。</param>
+            /// <param name="resourceIndexes">文件系统包含的资源索引集合。</param>
+            public FileSystem(string name, int[] resourceIndexes)
             {
-                if (string.IsNullOrEmpty(name))
+                if (name == null)
                 {
                     throw new GameFrameworkException("Name is invalid.");
                 }
 
                 m_Name = name;
-                m_DependencyAssetIndexes = dependencyAssetIndexes ?? EmptyIntArray;
+                m_ResourceIndexes = resourceIndexes ?? EmptyIntArray;
             }
 
             /// <summary>
-            /// 获取资源名称。
+            /// 获取文件系统名称。
             /// </summary>
             public string Name
             {
@@ -47,12 +47,12 @@ namespace GameFramework.Resource
             }
 
             /// <summary>
-            /// 获取资源包含的依赖资源索引集合。
+            /// 获取文件系统包含的资源索引集合。
             /// </summary>
-            /// <returns>资源包含的依赖资源索引集合。</returns>
-            public int[] GetDependencyAssetIndexes()
+            /// <returns>文件系统包含的资源索引集合。</returns>
+            public int[] GetResourceIndexes()
             {
-                return m_DependencyAssetIndexes;
+                return m_ResourceIndexes;
             }
         }
     }
