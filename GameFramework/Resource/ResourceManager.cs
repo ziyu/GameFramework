@@ -252,7 +252,7 @@ namespace GameFramework.Resource
         }
 
         /// <summary>
-        /// 获取已准备完毕资源数量。
+        /// 获取资源数量。
         /// </summary>
         public int AssetCount
         {
@@ -263,7 +263,7 @@ namespace GameFramework.Resource
         }
 
         /// <summary>
-        /// 获取已准备完毕资源数量。
+        /// 获取资源数量。
         /// </summary>
         public int ResourceCount
         {
@@ -1621,6 +1621,16 @@ namespace GameFramework.Resource
         public bool GetBinaryPath(string binaryAssetName, out bool storageInReadOnly, out bool storageInFileSystem, out string relativePath, out string fileName)
         {
             return m_ResourceLoader.GetBinaryPath(binaryAssetName, out storageInReadOnly, out storageInFileSystem, out relativePath, out fileName);
+        }
+
+        /// <summary>
+        /// 获取二进制资源的长度。
+        /// </summary>
+        /// <param name="binaryAssetName">要获取长度的二进制资源的名称。</param>
+        /// <returns>二进制资源的长度。</returns>
+        public int GetBinaryLength(string binaryAssetName)
+        {
+            return m_ResourceLoader.GetBinaryLength(binaryAssetName);
         }
 
         /// <summary>

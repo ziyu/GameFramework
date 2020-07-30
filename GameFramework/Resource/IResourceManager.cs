@@ -106,7 +106,7 @@ namespace GameFramework.Resource
         }
 
         /// <summary>
-        /// 获取已准备完毕资源数量。
+        /// 获取资源数量。
         /// </summary>
         int AssetCount
         {
@@ -114,7 +114,7 @@ namespace GameFramework.Resource
         }
 
         /// <summary>
-        /// 获取已准备完毕资源数量。
+        /// 获取资源数量。
         /// </summary>
         int ResourceCount
         {
@@ -609,6 +609,13 @@ namespace GameFramework.Resource
         /// <param name="fileName">若二进制资源存储在文件系统中，则指示二进制资源在文件系统中的名称，否则此参数返回空。</param>
         /// <returns>是否获取二进制资源的实际路径成功。</returns>
         bool GetBinaryPath(string binaryAssetName, out bool storageInReadOnly, out bool storageInFileSystem, out string relativePath, out string fileName);
+
+        /// <summary>
+        /// 获取二进制资源的长度。
+        /// </summary>
+        /// <param name="binaryAssetName">要获取长度的二进制资源的名称。</param>
+        /// <returns>二进制资源的长度。</returns>
+        int GetBinaryLength(string binaryAssetName);
 
         /// <summary>
         /// 异步加载二进制资源。
