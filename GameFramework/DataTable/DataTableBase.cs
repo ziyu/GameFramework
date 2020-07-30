@@ -7,6 +7,7 @@
 
 using GameFramework.Resource;
 using System;
+using System.Collections.Generic;
 
 namespace GameFramework.DataTable
 {
@@ -300,5 +301,83 @@ namespace GameFramework.DataTable
         /// 关闭并清理数据表。
         /// </summary>
         internal abstract void Shutdown();
+
+        /// <summary>
+        /// 检查是否存在数据表行。
+        /// </summary>
+        /// <param name="condition">要检查的条件。</param>
+        /// <returns>是否存在数据表行。</returns>
+        public abstract bool HasDataRow(Predicate<IDataRow> condition);
+
+        /// <summary>
+        /// 获取数据表行。
+        /// </summary>
+        /// <param name="id">数据表行的编号。</param>
+        /// <returns>数据表行。</returns>
+        public abstract IDataRow GetDataRow(int id);
+
+        /// <summary>
+        /// 获取符合条件的数据表行。
+        /// </summary>
+        /// <param name="condition">要检查的条件。</param>
+        /// <returns>符合条件的数据表行。</returns>
+        /// <remarks>当存在多个符合条件的数据表行时，仅返回第一个符合条件的数据表行。</remarks>
+        public abstract IDataRow GetDataRow(Predicate<IDataRow> condition);
+
+        /// <summary>
+        /// 获取符合条件的数据表行。
+        /// </summary>
+        /// <param name="condition">要检查的条件。</param>
+        /// <returns>符合条件的数据表行。</returns>
+        public abstract IDataRow[] GetDataRows(Predicate<IDataRow> condition);
+
+        /// <summary>
+        /// 获取符合条件的数据表行。
+        /// </summary>
+        /// <param name="condition">要检查的条件。</param>
+        /// <param name="results">符合条件的数据表行。</param>
+        public abstract void GetDataRows(Predicate<IDataRow> condition, List<IDataRow> results);
+
+        /// <summary>
+        /// 获取排序后的数据表行。
+        /// </summary>
+        /// <param name="comparison">要排序的条件。</param>
+        /// <returns>排序后的数据表行。</returns>
+        public abstract IDataRow[] GetDataRows(Comparison<IDataRow> comparison);
+
+        /// <summary>
+        /// 获取排序后的数据表行。
+        /// </summary>
+        /// <param name="comparison">要排序的条件。</param>
+        /// <param name="results">排序后的数据表行。</param>
+        public abstract void GetDataRows(Comparison<IDataRow> comparison, List<IDataRow> results);
+
+        /// <summary>
+        /// 获取排序后的符合条件的数据表行。
+        /// </summary>
+        /// <param name="condition">要检查的条件。</param>
+        /// <param name="comparison">要排序的条件。</param>
+        /// <returns>排序后的符合条件的数据表行。</returns>
+        public abstract IDataRow[] GetDataRows(Predicate<IDataRow> condition, Comparison<IDataRow> comparison);
+
+        /// <summary>
+        /// 获取排序后的符合条件的数据表行。
+        /// </summary>
+        /// <param name="condition">要检查的条件。</param>
+        /// <param name="comparison">要排序的条件。</param>
+        /// <param name="results">排序后的符合条件的数据表行。</param>
+        public abstract void GetDataRows(Predicate<IDataRow> condition, Comparison<IDataRow> comparison, List<IDataRow> results);
+
+        /// <summary>
+        /// 获取所有数据表行。
+        /// </summary>
+        /// <returns>所有数据表行。</returns>
+        public abstract IDataRow[] GetAllDataRows();
+
+        /// <summary>
+        /// 获取所有数据表行。
+        /// </summary>
+        /// <param name="results">所有数据表行。</param>
+        public abstract void GetAllDataRows(List<IDataRow> results);
     }
 }

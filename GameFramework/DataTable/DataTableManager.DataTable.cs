@@ -93,9 +93,9 @@ namespace GameFramework.DataTable
                 }
             }
 
-            public override IDataRow MinIdDataRow => m_MinIdDataRow;
+            public IDataRow MinIdDataRow => m_MinIdDataRow;
 
-            public override IDataRow MaxIdDataRow => m_MaxIdDataRow;
+            public IDataRow MaxIdDataRow => m_MaxIdDataRow;
 
             /// <summary>
             /// 检查是否存在数据表行。
