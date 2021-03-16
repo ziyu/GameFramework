@@ -1,6 +1,6 @@
 ﻿//------------------------------------------------------------
 // Game Framework
-// Copyright © 2013-2020 Jiang Yin. All rights reserved.
+// Copyright © 2013-2021 Jiang Yin. All rights reserved.
 // Homepage: https://gameframework.cn/
 // Feedback: mailto:ellan@gameframework.cn
 //------------------------------------------------------------
@@ -9,6 +9,7 @@ using GameFramework.Download;
 using GameFramework.FileSystem;
 using GameFramework.ObjectPool;
 using System;
+using System.Collections.Generic;
 
 namespace GameFramework.Resource
 {
@@ -417,10 +418,10 @@ namespace GameFramework.Resource
         /// </summary>
         /// <param name="versionListLength">版本资源列表大小。</param>
         /// <param name="versionListHashCode">版本资源列表哈希值。</param>
-        /// <param name="versionListZipLength">版本资源列表压缩后大小。</param>
-        /// <param name="versionListZipHashCode">版本资源列表压缩后哈希值。</param>
+        /// <param name="versionListCompressedLength">版本资源列表压缩后大小。</param>
+        /// <param name="versionListCompressedHashCode">版本资源列表压缩后哈希值。</param>
         /// <param name="updateVersionListCallbacks">版本资源列表更新回调函数集。</param>
-        void UpdateVersionList(int versionListLength, int versionListHashCode, int versionListZipLength, int versionListZipHashCode, UpdateVersionListCallbacks updateVersionListCallbacks);
+        void UpdateVersionList(int versionListLength, int versionListHashCode, int versionListCompressedLength, int versionListCompressedHashCode, UpdateVersionListCallbacks updateVersionListCallbacks);
 
         /// <summary>
         /// 使用可更新模式并检查资源。
@@ -437,7 +438,7 @@ namespace GameFramework.Resource
         void ApplyResources(string resourcePackPath, ApplyResourcesCompleteCallback applyResourcesCompleteCallback);
 
         /// <summary>
-        /// 使用可更新模式并更新全部资源。
+        /// 使用可更新模式并更新所有资源。
         /// </summary>
         /// <param name="updateResourcesCompleteCallback">使用可更新模式并更新默认资源组完成时的回调函数。</param>
         void UpdateResources(UpdateResourcesCompleteCallback updateResourcesCompleteCallback);
@@ -450,11 +451,28 @@ namespace GameFramework.Resource
         void UpdateResources(string resourceGroupName, UpdateResourcesCompleteCallback updateResourcesCompleteCallback);
 
         /// <summary>
+        /// 停止更新资源。
+        /// </summary>
+        void StopUpdateResources();
+
+        /// <summary>
         /// 校验资源包。
         /// </summary>
         /// <param name="resourcePackPath">要校验的资源包路径。</param>
         /// <returns>是否校验资源包成功。</returns>
         bool VerifyResourcePack(string resourcePackPath);
+
+        /// <summary>
+        /// 获取所有加载资源任务的信息。
+        /// </summary>
+        /// <returns>所有加载资源任务的信息。</returns>
+        TaskInfo[] GetAllLoadAssetInfos();
+
+        /// <summary>
+        /// 获取所有加载资源任务的信息。
+        /// </summary>
+        /// <param name="results">所有加载资源任务的信息。</param>
+        void GetAllLoadAssetInfos(List<TaskInfo> results);
 
         /// <summary>
         /// 检查资源是否存在。
@@ -688,6 +706,14 @@ namespace GameFramework.Resource
         /// </summary>
         /// <param name="binaryAssetName">要加载片段的二进制资源的名称。</param>
         /// <param name="buffer">存储加载二进制资源片段内容的二进制流。</param>
+        /// <returns>实际加载了多少字节。</returns>
+        int LoadBinarySegmentFromFileSystem(string binaryAssetName, byte[] buffer);
+
+        /// <summary>
+        /// 从文件系统中加载二进制资源的片段。
+        /// </summary>
+        /// <param name="binaryAssetName">要加载片段的二进制资源的名称。</param>
+        /// <param name="buffer">存储加载二进制资源片段内容的二进制流。</param>
         /// <param name="length">要加载片段的长度。</param>
         /// <returns>实际加载了多少字节。</returns>
         int LoadBinarySegmentFromFileSystem(string binaryAssetName, byte[] buffer, int length);
@@ -701,6 +727,15 @@ namespace GameFramework.Resource
         /// <param name="length">要加载片段的长度。</param>
         /// <returns>实际加载了多少字节。</returns>
         int LoadBinarySegmentFromFileSystem(string binaryAssetName, byte[] buffer, int startIndex, int length);
+
+        /// <summary>
+        /// 从文件系统中加载二进制资源的片段。
+        /// </summary>
+        /// <param name="binaryAssetName">要加载片段的二进制资源的名称。</param>
+        /// <param name="offset">要加载片段的偏移。</param>
+        /// <param name="buffer">存储加载二进制资源片段内容的二进制流。</param>
+        /// <returns>实际加载了多少字节。</returns>
+        int LoadBinarySegmentFromFileSystem(string binaryAssetName, int offset, byte[] buffer);
 
         /// <summary>
         /// 从文件系统中加载二进制资源的片段。
@@ -744,9 +779,29 @@ namespace GameFramework.Resource
         IResourceGroup GetResourceGroup(string resourceGroupName);
 
         /// <summary>
-        /// 获取所有加载资源任务的信息。
+        /// 获取所有资源组。
         /// </summary>
-        /// <returns>所有加载资源任务的信息。</returns>
-        TaskInfo[] GetAllLoadAssetInfos();
+        /// <returns>所有资源组。</returns>
+        IResourceGroup[] GetAllResourceGroups();
+
+        /// <summary>
+        /// 获取所有资源组。
+        /// </summary>
+        /// <param name="results">所有资源组。</param>
+        void GetAllResourceGroups(List<IResourceGroup> results);
+
+        /// <summary>
+        /// 获取资源组集合。
+        /// </summary>
+        /// <param name="resourceGroupNames">要获取的资源组名称的集合。</param>
+        /// <returns>要获取的资源组集合。</returns>
+        IResourceGroupCollection GetResourceGroupCollection(params string[] resourceGroupNames);
+
+        /// <summary>
+        /// 获取资源组集合。
+        /// </summary>
+        /// <param name="resourceGroupNames">要获取的资源组名称的集合。</param>
+        /// <returns>要获取的资源组集合。</returns>
+        IResourceGroupCollection GetResourceGroupCollection(List<string> resourceGroupNames);
     }
 }

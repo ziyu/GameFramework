@@ -1,6 +1,6 @@
 ﻿//------------------------------------------------------------
 // Game Framework
-// Copyright © 2013-2020 Jiang Yin. All rights reserved.
+// Copyright © 2013-2021 Jiang Yin. All rights reserved.
 // Homepage: https://gameframework.cn/
 // Feedback: mailto:ellan@gameframework.cn
 //------------------------------------------------------------
@@ -124,35 +124,38 @@ namespace GameFramework.Download
 
                 if (m_TimeLeft <= 0f)
                 {
-                    int totalDownloadLength = 0;
+                    long totalDeltaLength = 0L;
                     foreach (DownloadCounterNode downloadCounterNode in m_DownloadCounterNodes)
                     {
-                        totalDownloadLength += downloadCounterNode.DownloadedLength;
+                        totalDeltaLength += downloadCounterNode.DeltaLength;
                     }
 
-                    m_CurrentSpeed = m_Accumulator > 0f ? totalDownloadLength / m_Accumulator : 0f;
+                    m_CurrentSpeed = m_Accumulator > 0f ? totalDeltaLength / m_Accumulator : 0f;
                     m_TimeLeft += m_UpdateInterval;
                 }
             }
 
-            public void RecordDownloadedLength(int downloadedLength)
+            public void RecordDeltaLength(int deltaLength)
             {
-                if (downloadedLength <= 0)
+                if (deltaLength <= 0)
                 {
                     return;
                 }
 
+                DownloadCounterNode downloadCounterNode = null;
                 if (m_DownloadCounterNodes.Count > 0)
                 {
-                    DownloadCounterNode downloadCounterNode = m_DownloadCounterNodes.Last.Value;
+                    downloadCounterNode = m_DownloadCounterNodes.Last.Value;
                     if (downloadCounterNode.ElapseSeconds < m_UpdateInterval)
                     {
-                        downloadCounterNode.AddDownloadedLength(downloadedLength);
+                        downloadCounterNode.AddDeltaLength(deltaLength);
                         return;
                     }
                 }
 
-                m_DownloadCounterNodes.AddLast(DownloadCounterNode.Create(downloadedLength));
+                downloadCounterNode = DownloadCounterNode.Create();
+                downloadCounterNode.AddDeltaLength(deltaLength);
+                m_DownloadCounterNodes.AddLast(downloadCounterNode);
             }
 
             private void Reset()

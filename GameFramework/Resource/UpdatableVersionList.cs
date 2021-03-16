@@ -1,15 +1,18 @@
 ﻿//------------------------------------------------------------
 // Game Framework
-// Copyright © 2013-2020 Jiang Yin. All rights reserved.
+// Copyright © 2013-2021 Jiang Yin. All rights reserved.
 // Homepage: https://gameframework.cn/
 // Feedback: mailto:ellan@gameframework.cn
 //------------------------------------------------------------
+
+using System.Runtime.InteropServices;
 
 namespace GameFramework.Resource
 {
     /// <summary>
     /// 可更新模式版本资源列表。
     /// </summary>
+    [StructLayout(LayoutKind.Auto)]
     public partial struct UpdatableVersionList
     {
         private static readonly Asset[] EmptyAssetArray = new Asset[] { };
@@ -63,6 +66,11 @@ namespace GameFramework.Resource
         {
             get
             {
+                if (!m_IsValid)
+                {
+                    throw new GameFrameworkException("Data is invalid.");
+                }
+
                 return m_ApplicableGameVersion;
             }
         }
@@ -74,6 +82,11 @@ namespace GameFramework.Resource
         {
             get
             {
+                if (!m_IsValid)
+                {
+                    throw new GameFrameworkException("Data is invalid.");
+                }
+
                 return m_InternalResourceVersion;
             }
         }
@@ -84,6 +97,11 @@ namespace GameFramework.Resource
         /// <returns>包含的资源集合。</returns>
         public Asset[] GetAssets()
         {
+            if (!m_IsValid)
+            {
+                throw new GameFrameworkException("Data is invalid.");
+            }
+
             return m_Assets;
         }
 
@@ -93,6 +111,11 @@ namespace GameFramework.Resource
         /// <returns>包含的资源集合。</returns>
         public Resource[] GetResources()
         {
+            if (!m_IsValid)
+            {
+                throw new GameFrameworkException("Data is invalid.");
+            }
+
             return m_Resources;
         }
 
@@ -102,6 +125,11 @@ namespace GameFramework.Resource
         /// <returns>包含的文件系统集合。</returns>
         public FileSystem[] GetFileSystems()
         {
+            if (!m_IsValid)
+            {
+                throw new GameFrameworkException("Data is invalid.");
+            }
+
             return m_FileSystems;
         }
 
@@ -111,6 +139,11 @@ namespace GameFramework.Resource
         /// <returns>包含的资源组集合。</returns>
         public ResourceGroup[] GetResourceGroups()
         {
+            if (!m_IsValid)
+            {
+                throw new GameFrameworkException("Data is invalid.");
+            }
+
             return m_ResourceGroups;
         }
     }

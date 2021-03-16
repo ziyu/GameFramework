@@ -1,9 +1,11 @@
 ﻿//------------------------------------------------------------
 // Game Framework
-// Copyright © 2013-2020 Jiang Yin. All rights reserved.
+// Copyright © 2013-2021 Jiang Yin. All rights reserved.
 // Homepage: https://gameframework.cn/
 // Feedback: mailto:ellan@gameframework.cn
 //------------------------------------------------------------
+
+using System.Runtime.InteropServices;
 
 namespace GameFramework.Resource
 {
@@ -12,6 +14,7 @@ namespace GameFramework.Resource
         /// <summary>
         /// 资源。
         /// </summary>
+        [StructLayout(LayoutKind.Auto)]
         public struct Resource
         {
             private static readonly int[] EmptyIntArray = new int[] { };
@@ -22,8 +25,8 @@ namespace GameFramework.Resource
             private readonly byte m_LoadType;
             private readonly int m_Length;
             private readonly int m_HashCode;
-            private readonly int m_ZipLength;
-            private readonly int m_ZipHashCode;
+            private readonly int m_CompressedLength;
+            private readonly int m_CompressedHashCode;
             private readonly int[] m_AssetIndexes;
 
             /// <summary>
@@ -35,10 +38,10 @@ namespace GameFramework.Resource
             /// <param name="loadType">资源加载方式。</param>
             /// <param name="length">资源长度。</param>
             /// <param name="hashCode">资源哈希值。</param>
-            /// <param name="zipLength">资源压缩后长度。</param>
-            /// <param name="zipHashCode">资源压缩后哈希值。</param>
+            /// <param name="compressedLength">资源压缩后长度。</param>
+            /// <param name="compressedHashCode">资源压缩后哈希值。</param>
             /// <param name="assetIndexes">资源包含的资源索引集合。</param>
-            public Resource(string name, string variant, string extension, byte loadType, int length, int hashCode, int zipLength, int zipHashCode, int[] assetIndexes)
+            public Resource(string name, string variant, string extension, byte loadType, int length, int hashCode, int compressedLength, int compressedHashCode, int[] assetIndexes)
             {
                 if (string.IsNullOrEmpty(name))
                 {
@@ -51,8 +54,8 @@ namespace GameFramework.Resource
                 m_LoadType = loadType;
                 m_Length = length;
                 m_HashCode = hashCode;
-                m_ZipLength = zipLength;
-                m_ZipHashCode = zipHashCode;
+                m_CompressedLength = compressedLength;
+                m_CompressedHashCode = compressedHashCode;
                 m_AssetIndexes = assetIndexes ?? EmptyIntArray;
             }
 
@@ -125,22 +128,22 @@ namespace GameFramework.Resource
             /// <summary>
             /// 获取资源压缩后长度。
             /// </summary>
-            public int ZipLength
+            public int CompressedLength
             {
                 get
                 {
-                    return m_ZipLength;
+                    return m_CompressedLength;
                 }
             }
 
             /// <summary>
             /// 获取资源压缩后哈希值。
             /// </summary>
-            public int ZipHashCode
+            public int CompressedHashCode
             {
                 get
                 {
-                    return m_ZipHashCode;
+                    return m_CompressedHashCode;
                 }
             }
 

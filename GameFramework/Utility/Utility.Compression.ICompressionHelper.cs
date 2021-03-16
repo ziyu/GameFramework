@@ -1,6 +1,6 @@
 ﻿//------------------------------------------------------------
 // Game Framework
-// Copyright © 2013-2020 Jiang Yin. All rights reserved.
+// Copyright © 2013-2021 Jiang Yin. All rights reserved.
 // Homepage: https://gameframework.cn/
 // Feedback: mailto:ellan@gameframework.cn
 //------------------------------------------------------------
@@ -11,12 +11,12 @@ namespace GameFramework
 {
     public static partial class Utility
     {
-        public static partial class Zip
+        public static partial class Compression
         {
             /// <summary>
             /// 压缩解压缩辅助器接口。
             /// </summary>
-            public interface IZipHelper
+            public interface ICompressionHelper
             {
                 /// <summary>
                 /// 压缩数据。

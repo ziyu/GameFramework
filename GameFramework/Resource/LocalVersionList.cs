@@ -1,15 +1,18 @@
 ﻿//------------------------------------------------------------
 // Game Framework
-// Copyright © 2013-2020 Jiang Yin. All rights reserved.
+// Copyright © 2013-2021 Jiang Yin. All rights reserved.
 // Homepage: https://gameframework.cn/
 // Feedback: mailto:ellan@gameframework.cn
 //------------------------------------------------------------
+
+using System.Runtime.InteropServices;
 
 namespace GameFramework.Resource
 {
     /// <summary>
     /// 本地版本资源列表。
     /// </summary>
+    [StructLayout(LayoutKind.Auto)]
     public partial struct LocalVersionList
     {
         private static readonly Resource[] EmptyResourceArray = new Resource[] { };
@@ -48,6 +51,11 @@ namespace GameFramework.Resource
         /// <returns>包含的资源集合。</returns>
         public Resource[] GetResources()
         {
+            if (!m_IsValid)
+            {
+                throw new GameFrameworkException("Data is invalid.");
+            }
+
             return m_Resources;
         }
 
@@ -57,6 +65,11 @@ namespace GameFramework.Resource
         /// <returns>包含的文件系统集合。</returns>
         public FileSystem[] GetFileSystems()
         {
+            if (!m_IsValid)
+            {
+                throw new GameFrameworkException("Data is invalid.");
+            }
+
             return m_FileSystems;
         }
     }

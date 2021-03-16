@@ -1,6 +1,6 @@
 ﻿//------------------------------------------------------------
 // Game Framework
-// Copyright © 2013-2020 Jiang Yin. All rights reserved.
+// Copyright © 2013-2021 Jiang Yin. All rights reserved.
 // Homepage: https://gameframework.cn/
 // Feedback: mailto:ellan@gameframework.cn
 //------------------------------------------------------------
@@ -453,6 +453,7 @@ namespace GameFramework.Resource
                 {
                     m_SceneToAssetMap.Remove(sceneAssetName);
                     m_AssetPool.Unspawn(asset);
+                    m_AssetPool.ReleaseObject(asset);
                 }
                 else
                 {
@@ -805,6 +806,15 @@ namespace GameFramework.Resource
             public TaskInfo[] GetAllLoadAssetInfos()
             {
                 return m_TaskPool.GetAllTaskInfos();
+            }
+
+            /// <summary>
+            /// 获取所有加载资源任务的信息。
+            /// </summary>
+            /// <param name="results">所有加载资源任务的信息。</param>
+            public void GetAllLoadAssetInfos(List<TaskInfo> results)
+            {
+                m_TaskPool.GetAllTaskInfos(results);
             }
 
             private bool LoadDependencyAsset(string assetName, int priority, LoadResourceTaskBase mainTask, object userData)

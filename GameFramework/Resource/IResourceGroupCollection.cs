@@ -10,20 +10,12 @@ using System.Collections.Generic;
 namespace GameFramework.Resource
 {
     /// <summary>
-    /// 资源组接口。
+    /// 资源组集合接口。
     /// </summary>
-    public interface IResourceGroup
+    public interface IResourceGroupCollection
     {
         /// <summary>
-        /// 获取资源组名称。
-        /// </summary>
-        string Name
-        {
-            get;
-        }
-
-        /// <summary>
-        /// 获取资源组是否准备完毕。
+        /// 获取资源组集合是否准备完毕。
         /// </summary>
         bool Ready
         {
@@ -31,7 +23,7 @@ namespace GameFramework.Resource
         }
 
         /// <summary>
-        /// 获取资源组包含资源数量。
+        /// 获取资源组集合包含资源数量。
         /// </summary>
         int TotalCount
         {
@@ -39,7 +31,7 @@ namespace GameFramework.Resource
         }
 
         /// <summary>
-        /// 获取资源组中已准备完成资源数量。
+        /// 获取资源组集合中已准备完成资源数量。
         /// </summary>
         int ReadyCount
         {
@@ -47,7 +39,7 @@ namespace GameFramework.Resource
         }
 
         /// <summary>
-        /// 获取资源组包含资源的总大小。
+        /// 获取资源组集合包含资源的总大小。
         /// </summary>
         long TotalLength
         {
@@ -55,7 +47,7 @@ namespace GameFramework.Resource
         }
 
         /// <summary>
-        /// 获取资源组包含资源压缩后的总大小。
+        /// 获取资源组集合包含资源压缩后的总大小。
         /// </summary>
         long TotalCompressedLength
         {
@@ -63,7 +55,7 @@ namespace GameFramework.Resource
         }
 
         /// <summary>
-        /// 获取资源组中已准备完成资源的总大小。
+        /// 获取资源组集合中已准备完成资源的总大小。
         /// </summary>
         long ReadyLength
         {
@@ -71,7 +63,7 @@ namespace GameFramework.Resource
         }
 
         /// <summary>
-        /// 获取资源组中已准备完成资源压缩后的总大小。
+        /// 获取资源组集合中已准备完成资源压缩后的总大小。
         /// </summary>
         long ReadyCompressedLength
         {
@@ -79,7 +71,7 @@ namespace GameFramework.Resource
         }
 
         /// <summary>
-        /// 获取资源组的完成进度。
+        /// 获取资源组集合的完成进度。
         /// </summary>
         float Progress
         {
@@ -87,13 +79,19 @@ namespace GameFramework.Resource
         }
 
         /// <summary>
-        /// 获取资源组包含的资源名称列表。
+        /// 获取资源组集合包含的资源组列表。
+        /// </summary>
+        /// <returns>资源组包含的资源名称列表。</returns>
+        IResourceGroup[] GetResourceGroups();
+
+        /// <summary>
+        /// 获取资源组集合包含的资源名称列表。
         /// </summary>
         /// <returns>资源组包含的资源名称列表。</returns>
         string[] GetResourceNames();
 
         /// <summary>
-        /// 获取资源组包含的资源名称列表。
+        /// 获取资源组集合包含的资源名称列表。
         /// </summary>
         /// <param name="results">资源组包含的资源名称列表。</param>
         void GetResourceNames(List<string> results);
